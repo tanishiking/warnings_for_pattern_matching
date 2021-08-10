@@ -452,6 +452,7 @@ $U_{rec}(S(Leaf, P), S(Leaf, \vec{q})) = U_{rec}((\_), (\_)) = false$
 $U_{rec}(P, \vec{q}) = U_{rec}(S(Branch, P), S(Branch, \vec{q})) \lor U_{rec}(S(Leaf, P), S(Leaf, \vec{q})) = false$
 
 Therefore P is exhaustive.
+
 # Conclusion and what to study next
 In this report, I summarized how OCaml checks exhaustiveness and detect useless clause for Algebraic Data Types.
 
