@@ -19,7 +19,7 @@ case class Branch(t1: Tree, t2: Tree) extends Tree
 case class Leaf(v: Int) extends Tree
 ```
 
-If the pattern match against `Tree` is not exhaustive, we have a risk of crashing at runtime if the incoming value is not-considered pattern.
+If the pattern match against `Tree` is not exhaustive, we have a risk of crashing at runtime.
 
 ```scala
 // it crashes at runtime if t = Branch(Branch(...), Leaf(...))
@@ -39,9 +39,6 @@ def patternMatch(t: Tree) = t match {
   case Leaf(_) => ???
 }
 ```
-
-This report summarize the exhaustiveness check algorithm in OCaml.
-Maranget, Luc. "Warnings for pattern matching." Journal of Functional Programming 17.3 (2007): 387-421.
 
 Therefore, it's significant feature for abstract data types and pattern matching to be able to statically check
 
@@ -79,27 +76,40 @@ In this report, I'll survey how OCaml checks exhaustiveness and detects useless 
 (That paper is a prior work of [A generic algorithm for checking exhaustivity of pattern matching (short paper)](https://dl.acm.org/doi/10.1145/2998392.2998401) which generalize the algorithm so it can cover other rich language features such as GADT, this algorithm is employed by Scala3 and Swift).
 
 # Preparation
+Let's start with formalizing the Abstract Data Types and Pattern matches.
+
 ## Value
-まずは論文中で使われる用語などを定義していく。
-
-
-```
-value ::= 
-          c(v_1, ..., v_a) (a >= 0)
-```
 
 \begin{eqnarray*}
   v &::=& \\
     &|& c(v_1, ..., v_a) \\
 \end{eqnarray*}
 
-`c` means constructor.
+`c` means constructor. For example,
 
-// 型は少なくとも1つの値を持つことを仮定する
+```scala
+sealed abstract class Tree
+case class Branch(t1: Tree, t2: Tree) extends Tree
+case class Leaf(v: Int) extends Tree
+```
+
+`c` is `Branch` or `Leaf`.
+
+Note that in this system, we follow the following axiom
+
+> given any type t, we assume the existence of at least one value that possesses t as a type.
+
 
 ## Patterns
 
-In the real program, programmers sometimes write something like the following program:
+\begin{eqnarray*}
+  p &::=& \\
+    &|& \_ \\
+    &|& c(p_1, ..., p_a) \\
+    &|& (p_1 \| p_2) \\
+\end{eqnarray*}
+
+Note that there's no variable pattern such as 
 
 ```scala
 x match {
@@ -108,14 +118,18 @@ x match {
 }
 ```
 
-In this program, the second case `case other => ???` catches any values and bind it to `other`. However, in the context of checking exhaustiveness of pattern matches, we don't need to care the variable name, and we can see the variable pattern as a wildcard pattern.
+
+in the second case.
+
+In the above program, the second case `case other => ???` catches any values and bind it to `other`. However, in the context of checking exhaustiveness of pattern matches, we don't need to care the variable name, and we can see the variable pattern as a wildcard pattern.
 
 ---
 
 # Definitions
 ## Instance Relation
+Define the relation between value `v` and pattern `p`.
 
-| pattern | | | |
+| pattern | | value | |
 |---|---|---|---|
 | _  | $\preceq$  | $v$  |   |
 | $(p_1\|p_2)$  | $\preceq$  | $v$  | (iff $p_1 \preceq v \lor p_2 \preceq v$ ) | 
@@ -130,6 +144,12 @@ In this program, the second case `case other => ???` catches any values and bind
 - `Branch(_, _) | Leaf(_)` $\preceq$ `Branch(Leaf(1), Leaf(1))`
 
 ## Pattern vector and pattern matrix
+We introduce useful notation $\vec{p} = (p_1,...p_a)$ and $\vec{v} = (v_1,...v_a)$. They stand for row vector of patterns and values respectively.
+
+Also, we introduce pattern matrix $P = (p_j^i)$ of size $m \times n$.
+
+For example, when we have the following pattern matches
+
 ```scala
 (x, y) match {
   case (Branch(_, _), Branch(_, _)) => ???
@@ -139,6 +159,7 @@ In this program, the second case `case other => ???` catches any values and bind
 }
 ```
 
+we have following pattern matrix P.
 
 \begin{equation}
 P = 
@@ -160,6 +181,8 @@ for matrix $m= 0 \land n= 0$ we write $\varnothing$
 
 
 ## ML Pattern matching (filter, match)
+Let's formalize what the meaning of pattern **matches** in this system.
+
 - P is pattern matrix
 - $\vec{v}$ is a value vector $(v_1,...v_n)$
 
@@ -178,6 +201,8 @@ $\exists i \in [1..m] s.t. (p_1^i ... p_n^i) \preceq (v_1 ... v_n)$ (say $\vec{v
 We write $P^{[1..i)}$ as the 1 to i-1 rows of P (who is $(i-1)\times n$ matrix).
 
 $\vec{v}$ matches P $\iff$ $P^{[1..i)} \nprec \vec{v} \land \vec{p^i} \preceq \vec{v}$
+
+Now, we can define `exhaustiveness` and `useless clause` in this setting.
 
 ## Exhaustiveness
 P is **exhaustive** if and only if $\forall \vec{v}$ of the appropriate type P filters $\vec{v}$
@@ -212,6 +237,7 @@ Now we broke down the `exhaustiveness` and `usefulness` problem into calculating
 
 # Calculate $U(P, \vec{q})$
 We define recursive function $U_{rec}$ and proove $U(P, \vec{q}) = U_{rec}(P, \vec{q})$
+We should proove the equality, but we skip it in this report.
 
 ## Base case
 If P is $m \times 0$ matrix (remember we write such matrix as $()$ ), it depends on `m`.
@@ -426,3 +452,10 @@ $U_{rec}(S(Leaf, P), S(Leaf, \vec{q})) = U_{rec}((\_), (\_)) = false$
 $U_{rec}(P, \vec{q}) = U_{rec}(S(Branch, P), S(Branch, \vec{q})) \lor U_{rec}(S(Leaf, P), S(Leaf, \vec{q})) = false$
 
 Therefore P is exhaustive.
+# Conclusion and what to study next
+In this report, I summarized how OCaml checks exhaustiveness and detect useless clause for Algebraic Data Types.
+
+However, in the modern programming languages, abstract data types are enriched with a lot of features like GADTs, mixins, and typecases. Without good abstraction, those features complicates the exhaustive check algorithm and makes it impossible to maintain.　For these reasons, Dotty (Scala3) introduces a new algorithm that covers rich language features (and Swift also used that algorithm). Also GHC employs it's own exhaustive check algorithm.
+
+- Liu, Fengyun. "A generic algorithm for checking exhaustivity of pattern matching (short paper)." Proceedings of the 2016 7th ACM SIGPLAN Symposium on Scala. 2016.
+- Karachalias, Georgios, et al. "GADTs Meet Their Match: pattern-matching warnings that account for GADTs, guards, and laziness." Proceedings of the 20th ACM SIGPLAN International Conference on Functional Programming. 2015.
