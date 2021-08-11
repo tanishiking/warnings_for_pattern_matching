@@ -278,7 +278,7 @@ For example,
 \begin{equation}
 P = 
 \begin{pmatrix}
-Branch(Leaf(_), \_) & ... \\
+Branch(Leaf(\_), \_) & ... \\
 \_ & ... \\
 \end{pmatrix} \\
 \Sigma = \{ Branch \}
@@ -287,7 +287,7 @@ Branch(Leaf(_), \_) & ... \\
 \begin{equation}
 P = 
 \begin{pmatrix}
-Branch(Leaf(_), \_) & ... \\
+Branch(Leaf(\_), \_) & ... \\
 Leaf(\_) & ... \\
 \_ & ... \\
 \end{pmatrix} \\
